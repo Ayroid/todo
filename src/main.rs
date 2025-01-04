@@ -1,51 +1,119 @@
+// src/main.rs
+mod cli;
+mod error;
 mod storage;
 mod task;
 
-use std::env;
+use chrono::{DateTime, Utc};
+use clap::Parser;
+use cli::{Cli, Command};
+use error::Result;
 use storage::TaskStorage;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
+fn parse_date(date_str: &str) -> Result<DateTime<Utc>> {
+    let naive_date = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+        .map_err(|_| error::TodoError::ValidationError("Invalid date format".to_string()))?;
+
+    let naive_datetime = naive_date
+        .and_hms_opt(23, 59, 59)
+        .ok_or_else(|| error::TodoError::ValidationError("Invalid time".to_string()))?;
+
+    Ok(DateTime::from_naive_utc_and_offset(naive_datetime, Utc))
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
     let mut storage = TaskStorage::new();
 
-    match args.get(1).map(|s| s.as_str()) {
-        Some("add") => {
-            if let Some(title) = args.get(2) {
-                let task = storage.add_task(title.to_string());
-                println!("Added task #{}: {}", task.id, task.title);
+    match cli.command {
+        Command::Add {
+            title,
+            description,
+            due,
+        } => {
+            let due_date = if let Some(date_str) = due {
+                Some(parse_date(&date_str)?)
             } else {
-                println!("Please provide a task title!");
-            }
+                None
+            };
+
+            let task = storage.add_task(title.clone(), description, due_date)?;
+            println!("Added task #{}: {}", task.id, task.title);
         }
-        Some("list") => {
-            let tasks = storage.list_tasks();
+
+        Command::List {
+            completed,
+            sort_by_due,
+        } => {
+            let mut tasks = storage.list_tasks().to_vec();
+
+            if let Some(is_completed) = completed {
+                tasks.retain(|task| task.completed == is_completed);
+            }
+
+            if sort_by_due {
+                tasks.sort_by_key(|task| task.due_date);
+            }
+
             if tasks.is_empty() {
-                println!("No tasks yet!");
+                println!("No tasks found!");
             } else {
                 for task in tasks {
-                    println!("#{}: {} {}", task.id, task.title, if task.completed { '🟢' } else { '🔴' });
+                    let status = if task.completed { "✅" } else { "⭕" };
+                    let due_str = task.due_date.map_or("No due date".to_string(), |d| {
+                        d.format("%Y-%m-%d").to_string()
+                    });
+                    println!("{} #{}: {} (Due: {})", status, task.id, task.title, due_str);
                 }
             }
         }
-        Some("complete") => {
-            if let Some(id_str) = args.get(2) {
-                if let Ok(id) = id_str.parse::<u32>() {
-                    if storage.complete_task(id) {
-                        println!("Task #{} marked as complete!", id);
-                    } else {
-                        println!("Task not found!");
-                    }
+
+        Command::View { id } => {
+            let task = storage.get_task(id)?;
+            println!("Task #{}", task.id);
+            println!("Title: {}", task.title);
+            if let Some(desc) = &task.description {
+                println!("Description: {}", desc);
+            }
+            println!(
+                "Status: {}",
+                if task.completed {
+                    "Completed"
                 } else {
-                    println!("Please provide a valid task ID");
+                    "Pending"
                 }
-            } else {
-                println!("Please provide a task ID");
+            );
+            if let Some(due) = task.due_date {
+                println!("Due: {}", due.format("%Y-%m-%d"));
             }
         }
-        _ => {
-            println!("Usage:");
-            println!(" todo add <title> - Add new task");
-            println!(" todo list - List all tasks");
+
+        Command::Complete { id } => {
+            storage.complete_task(id)?;
+            println!("Task #{} marked as complete!", id);
+        }
+
+        Command::Edit {
+            id,
+            title,
+            description,
+            due,
+        } => {
+            let due_date = if let Some(date_str) = due {
+                Some(parse_date(&date_str)?)
+            } else {
+                None
+            };
+
+            storage.edit_task(id, title, description, due_date)?;
+            println!("Task #{} updated successfully!", id);
+        }
+
+        Command::Delete { id } => {
+            storage.delete_task(id)?;
+            println!("Task #{} deleted successfully!", id);
         }
     }
+
+    Ok(())
 }
