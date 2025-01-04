@@ -1,0 +1,18 @@
+[package]
+name = "todo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# For parsing command-line arguments (using derive macros)
+clap = { version = "4.4", features = ["derive"] }
+# For serialization/deserialization of data
+serde = { version = "1.0", features = ["derive"] }
+# For JSON file handling
+serde_json = "1.0"
+# For handling dates and times
+chrono = { version = "0.4", features = ["serde"] }
+# For error handling convenience
+anyhow = "1.0"
+# For creating custom error types
+thiserror = "2.0.9"
