@@ -38,6 +38,16 @@ impl TaskStorage {
         task
     }
 
+    pub fn complete_task(&mut self, id: u32) -> bool {
+        if let Some(task) = self.tasks.iter_mut().find(|t| t.id == id) {
+            task.completed = true;
+            self.save_tasks();
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn list_tasks(&self) -> &Vec<Task> {
         &self.tasks
     }

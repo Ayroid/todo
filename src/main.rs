@@ -1,8 +1,8 @@
 mod storage;
 mod task;
 
-use storage::TaskStorage;
 use std::env;
+use storage::TaskStorage;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -23,8 +23,23 @@ fn main() {
                 println!("No tasks yet!");
             } else {
                 for task in tasks {
-                    println!("#{}: {}", task.id, task.title);
+                    println!("#{}: {} {}", task.id, task.title, if task.completed { '🟢' } else { '🔴' });
                 }
+            }
+        }
+        Some("complete") => {
+            if let Some(id_str) = args.get(2) {
+                if let Ok(id) = id_str.parse::<u32>() {
+                    if storage.complete_task(id) {
+                        println!("Task #{} marked as complete!", id);
+                    } else {
+                        println!("Task not found!");
+                    }
+                } else {
+                    println!("Please provide a valid task ID");
+                }
+            } else {
+                println!("Please provide a task ID");
             }
         }
         _ => {
