@@ -1,3 +1,7 @@
+mod task;
+use task::Task;
+
 fn main() {
-    println!("Hello, world!");
+    let task = Task::new(1, String::from("Learn Rust"));
+    println!("Task Created: {:?}", task);
 }
