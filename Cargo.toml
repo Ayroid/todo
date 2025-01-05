@@ -1,18 +1,18 @@
+# In Cargo.toml, add these fields:
 [package]
 name = "todo"
 version = "0.1.0"
 edition = "2021"
+description = "A simple CLI todo application"
+
+# Add this section to specify the binary name
+[[bin]]
+name = "todo"
+path = "src/main.rs"
 
 [dependencies]
-# For parsing command-line arguments (using derive macros)
-clap = { version = "4.4", features = ["derive"] }
-# For serialization/deserialization of data
+clap = { version = "4.0", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
-# For JSON file handling
 serde_json = "1.0"
-# For handling dates and times
-chrono = { version = "0.4", features = ["serde"] }
-# For error handling convenience
-anyhow = "1.0"
-# For creating custom error types
 thiserror = "2.0.9"
+chrono = { version = "0.4", features = ["serde"] }
