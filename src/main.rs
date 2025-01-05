@@ -1,51 +1,69 @@
+// src/main.rs
+
+mod cli;
+mod error;
 mod storage;
 mod task;
 
-use std::env;
+use clap::Parser;
+use cli::{Cli, Commands};
+use error::Result;
 use storage::TaskStorage;
+use task::Task;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut storage = TaskStorage::new();
+use std::path::PathBuf;
 
-    match args.get(1).map(|s| s.as_str()) {
-        Some("add") => {
-            if let Some(title) = args.get(2) {
-                let task = storage.add_task(title.to_string());
-                println!("Added task #{}: {}", task.id, task.title);
-            } else {
-                println!("Please provide a task title!");
-            }
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    let mut storage = TaskStorage::new(PathBuf::from("tasks.json"));
+
+    match cli.command {
+        Commands::Add { title, description } => {
+            let tasks = storage.load_tasks()?;
+            let new_id = tasks.last().map_or(1, |t| t.id + 1);
+            let task = Task::new(new_id, title, description);
+            storage.add_task(task)?;
+            println!("Task added successfully!");
         }
-        Some("list") => {
-            let tasks = storage.list_tasks();
+        Commands::List => {
+            let tasks = storage.load_tasks()?;
             if tasks.is_empty() {
-                println!("No tasks yet!");
-            } else {
-                for task in tasks {
-                    println!("#{}: {} {}", task.id, task.title, if task.completed { '🟢' } else { '🔴' });
-                }
+                println!("No tasks found.");
+                return Ok(());
+            }
+
+            for task in tasks {
+                println!(
+                    "#{} [{}] {} {}",
+                    task.id,
+                    if task.completed { "✓" } else { " " },
+                    task.title,
+                    task.description.unwrap_or_default()
+                );
             }
         }
-        Some("complete") => {
-            if let Some(id_str) = args.get(2) {
-                if let Ok(id) = id_str.parse::<u32>() {
-                    if storage.complete_task(id) {
-                        println!("Task #{} marked as complete!", id);
-                    } else {
-                        println!("Task not found!");
-                    }
-                } else {
-                    println!("Please provide a valid task ID");
-                }
-            } else {
-                println!("Please provide a task ID");
+        Commands::View { id } => {
+            let task = storage.get_task(id)?;
+            println!("Task #{}", task.id);
+            println!("Title: {}", task.title);
+            println!("Description: {}", task.description.unwrap_or_default());
+            println!("Status: {}", if task.completed { "Completed" } else { "Pending" });
+            println!("Created: {}", task.created_at);
+            if let Some(completed_at) = task.completed_at {
+                println!("Completed: {}", completed_at);
             }
         }
-        _ => {
-            println!("Usage:");
-            println!(" todo add <title> - Add new task");
-            println!(" todo list - List all tasks");
+        Commands::Complete { id } => {
+            let mut task = storage.get_task(id)?;
+            task.complete();
+            storage.update_task(id, task)?;
+            println!("Task #{} marked as complete!", id);
+        }
+        Commands::Delete { id } => {
+            storage.delete_task(id)?;
+            println!("Task #{} deleted successfully!", id);
         }
     }
+
+    Ok(())
 }
